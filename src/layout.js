@@ -98,14 +98,18 @@ export function getShortColumn(positions, buffer) {
  * @param {number} total The total number of columns or rows.
  * @param {number} threshold Buffer value for the column to fit.
  * @param {number} buffer Vertical buffer for the height of items.
+ * @param {number} previousX Item x position to keep horizontal order.
  * @return {Point}
  */
 export function getItemPosition({
-  itemSize, positions, gridSize, total, threshold, buffer,
+  itemSize, positions, gridSize, total, threshold, buffer, previousX,
 }) {
   const span = getColumnSpan(itemSize.width, gridSize, total, threshold);
   const setY = getAvailablePositions(positions, span, total);
-  const shortColumnIndex = getShortColumn(setY, buffer);
+  const shortColumnIndex =
+    previousX === undefined ?
+      getShortColumn(setY, buffer) :
+      previousX / gridSize;
 
   // Position the item
   const point = new Point(gridSize * shortColumnIndex, setY[shortColumnIndex]);

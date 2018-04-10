@@ -435,6 +435,7 @@ class Shuffle extends TinyEmitter {
     }
 
     this.cols = Math.max(Math.floor(calculatedColumns), 1);
+    this.isNotResized = Boolean(this.containerWidth) && this.containerWidth === containerWidth;
     this.containerWidth = containerWidth;
     this.colWidth = columnWidth;
   }
@@ -552,6 +553,17 @@ class Shuffle extends TinyEmitter {
       return this.getTransformedPositions(itemsData, this.containerWidth);
     }
 
+    // If option keepOrder set, position items by the determined order when
+    // items are initialized or positioned after container size changed.
+    if (this.options.keepOrder && this.isInitialized && this.isNotResized) {
+      const itemsData = items.map((item) => {
+        const itemSize = Shuffle.getSize(item.element, true);
+        return this._getItemPosition(itemSize, item.point.x);
+      });
+
+      return itemsData;
+    }
+
     // If no transforms are going to happen, simply return an array of the
     // future points of each item.
     return items.map(item => this._getItemPosition(Shuffle.getSize(item.element, true)));
@@ -560,10 +572,11 @@ class Shuffle extends TinyEmitter {
   /**
    * Determine the location of the next item, based on its size.
    * @param {{width: number, height: number}} itemSize Object with width and height.
+   * @param {number} previousX Item x position in the previous positioning.
    * @return {Point}
    * @private
    */
-  _getItemPosition(itemSize) {
+  _getItemPosition(itemSize, previousX) {
     return getItemPosition({
       itemSize,
       positions: this.positions,
@@ -571,6 +584,7 @@ class Shuffle extends TinyEmitter {
       total: this.cols,
       threshold: this.options.columnThreshold,
       buffer: this.options.buffer,
+      previousX,
     });
   }
 
