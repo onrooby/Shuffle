@@ -433,17 +433,23 @@
     HIDDEN: 0.001
   };
 
-  var element = document.body || document.documentElement;
-  var e = document.createElement('div');
-  e.style.cssText = 'width:10px;padding:2px;box-sizing:border-box;';
-  element.appendChild(e);
+  var value = null;
+  var testComputedSize = (function () {
+    if (value !== null) {
+      return value;
+    }
 
-  var _window$getComputedSt = window.getComputedStyle(e, null),
-      width = _window$getComputedSt.width;
+    var element = document.body || document.documentElement;
+    var e = document.createElement('div');
+    e.style.cssText = 'width:10px;padding:2px;box-sizing:border-box;';
+    element.appendChild(e);
 
-  var ret = width === '10px';
+    value = window.getComputedStyle(e, null).width === '10px';
 
-  element.removeChild(e);
+    element.removeChild(e);
+
+    return value;
+  });
 
   /**
    * Retrieve the computed style for an element, parsed as a float.
@@ -461,9 +467,9 @@
     var value = getNumber(styles[style]);
 
     // Support IE<=11 and W3C spec.
-    if (!ret && style === 'width') {
+    if (!testComputedSize() && style === 'width') {
       value += getNumber(styles.paddingLeft) + getNumber(styles.paddingRight) + getNumber(styles.borderLeftWidth) + getNumber(styles.borderRightWidth);
-    } else if (!ret && style === 'height') {
+    } else if (!testComputedSize() && style === 'height') {
       value += getNumber(styles.paddingTop) + getNumber(styles.paddingBottom) + getNumber(styles.borderTopWidth) + getNumber(styles.borderBottomWidth);
     }
 
@@ -705,6 +711,7 @@
    * @param {number} total The total number of columns or rows.
    * @param {number} threshold Buffer value for the column to fit.
    * @param {number} buffer Vertical buffer for the height of items.
+   * @param {number} previousX Item x position to keep horizontal order.
    * @return {Point}
    */
   function getItemPosition(_ref) {
@@ -713,11 +720,12 @@
         gridSize = _ref.gridSize,
         total = _ref.total,
         threshold = _ref.threshold,
-        buffer = _ref.buffer;
+        buffer = _ref.buffer,
+        previousX = _ref.previousX;
 
     var span = getColumnSpan(itemSize.width, gridSize, total, threshold);
     var setY = getAvailablePositions(positions, span, total);
-    var shortColumnIndex = getShortColumn(setY, buffer);
+    var shortColumnIndex = previousX === undefined ? getShortColumn(setY, buffer) : previousX / gridSize;
 
     // Position the item
     var point = new Point(gridSize * shortColumnIndex, setY[shortColumnIndex]);
@@ -1334,6 +1342,7 @@
         }
 
         this.cols = Math.max(Math.floor(calculatedColumns), 1);
+        this.isNotResized = Boolean(this.containerWidth) && this.containerWidth === containerWidth;
         this.containerWidth = containerWidth;
         this.colWidth = columnWidth;
       }
@@ -1478,6 +1487,17 @@
           return this.getTransformedPositions(itemsData, this.containerWidth);
         }
 
+        // If option keepOrder set, position items by the determined order when
+        // items are initialized or positioned after container size changed.
+        if (this.options.keepOrder && this.isInitialized && this.isNotResized) {
+          var _itemsData = items.map(function (item) {
+            var itemSize = Shuffle.getSize(item.element, true);
+            return _this5._getItemPosition(itemSize, item.point.x);
+          });
+
+          return _itemsData;
+        }
+
         // If no transforms are going to happen, simply return an array of the
         // future points of each item.
         return items.map(function (item) {
@@ -1488,20 +1508,22 @@
       /**
        * Determine the location of the next item, based on its size.
        * @param {{width: number, height: number}} itemSize Object with width and height.
+       * @param {number} previousX Item x position in the previous positioning.
        * @return {Point}
        * @private
        */
 
     }, {
       key: '_getItemPosition',
-      value: function _getItemPosition(itemSize) {
+      value: function _getItemPosition(itemSize, previousX) {
         return getItemPosition({
           itemSize: itemSize,
           positions: this.positions,
           gridSize: this.colWidth,
           total: this.cols,
           threshold: this.options.columnThreshold,
-          buffer: this.options.buffer
+          buffer: this.options.buffer,
+          previousX: previousX
         });
       }
 
